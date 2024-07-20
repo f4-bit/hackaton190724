@@ -1,24 +1,46 @@
 import panel as pn
-import matplotlib.pyplot as plt
+import pandas as pd
 
-# Crear un gráfico de Matplotlib
-fig, ax = plt.subplots()
-ax.plot([1, 2, 3, 4], [10, 20, 25, 30])
-ax.set_title('Gráfico de Matplotlib en Panel')
+# Configurar Panel
+pn.extension()
 
-# Convertir el gráfico de Matplotlib en un objeto Panel
-matplotlib_pane = pn.pane.Matplotlib(fig)
+# Cargar el archivo XLS en un DataFrame
+file_path = 'test_data.xlsx'
+df = pd.read_excel(file_path)
 
-# Crear algunos widgets
-slider = pn.widgets.FloatSlider(name='Slider', start=0, end=10, step=0.1)
-button = pn.widgets.Button(name='Botón')
+# Asegurarse de que las columnas tienen los nombres correctos
+df.columns = ['url','title', 'seendate', 'domain','content']
 
-# Usar una plantilla
-template = pn.template.FastListTemplate(
-    title='Mi Aplicación con Panel',
-    sidebar=[slider, button],
-    main=[matplotlib_pane]
+# Extraer y convertir la fecha en la misma columna
+df['seendate'] = pd.to_datetime(df['seendate'].str[:8], format='%Y%m%d')
+
+# Renombrar la columna para claridad
+df.rename(columns={'seendate': 'fecha'}, inplace=True)
+
+# Widgets para filtros
+date_picker = pn.widgets.DatePicker(name='Fecha')
+portal_selector = pn.widgets.Select(name='Portal de Noticias', options=['Todos'] + list(df['domain'].unique()))
+keyword_input = pn.widgets.TextInput(name='Palabra Clave')
+
+# Filtro de datos basado en los widgets
+@pn.depends(date_picker, portal_selector, keyword_input)
+def filter_news(date, portal, keyword):
+    filtered_df = df.copy()
+
+    if date:
+        filtered_df = filtered_df[filtered_df['fecha'].dt.date == date]
+    if portal != 'Todos':
+        filtered_df = filtered_df[filtered_df['domain'] == portal]
+    if keyword:
+        filtered_df = filtered_df[filtered_df['title'].str.contains(keyword, case=False)]
+
+    return filtered_df
+
+# Layout de la aplicación
+layout = pn.Column(
+    pn.Row(date_picker, portal_selector, keyword_input),
+    pn.panel(filter_news)
 )
 
 # Servir la aplicación
-template.servable()
+layout.servable()

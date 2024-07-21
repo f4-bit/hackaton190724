@@ -188,11 +188,11 @@ def obtener_tags_from_js_eltiempo(soup):
     """
     Extrae etiquetas desde un bloque de JavaScript en una página web.
 
-    Parámetros:
-    url (str): URL del artículo desde el cual extraer las etiquetas.
+    Args:
+        soup (BeautifulSoup): Objeto BeautifulSoup que representa el contenido HTML de la página.
 
-    Retorna:
-    list: Lista de etiquetas formateadas.
+    Returns:
+        list: Lista de etiquetas extraídas y formateadas, o None si ocurre un error.
     """
     try:
         # Encontrar el bloque <script> que contiene el JavaScript con tagsArticle
@@ -244,6 +244,39 @@ def obtener_comentarios_eltiempo(id_, timeout=10):
     return comentarios
 
 ####################### EL ESPECTADOR #########################################################
+def extract_comments_elespectador(id_, timeout = 10):
+        """
+        Extrae los comentarios de un artículo de El Espectador dado su ID.
+
+        Parameters:
+        article_id (str): El ID del artículo para el cual se desean obtener los comentarios.
+        timeout (int): El tiempo de espera para la solicitud HTTP (por defecto 10).
+
+        Returns:
+        list: Una lista de comentarios si se encuentran, de lo contrario None.
+        """
+        
+        if id_ is not None:
+            url = f'https://www.elespectador.com/pf/api/v3/content/fetch/comments?query=%7B"articleId"%3A"{id_}"%7D&d=937&_website=el-espectador'
+            
+            try:
+                response = requests.get(url, timeout=timeout)
+                response.raise_for_status()
+
+                data = response.json()
+                comentarios = [comment['content'] for comment in data.get('body', [])]
+
+            except requests.exceptions.RequestException as e:
+                print(f"Error en la solicitud: {e}")
+                comentarios = None
+
+            except ValueError as e:
+                print(f"Error al procesar la respuesta JSON: {e}")
+                comentarios = None
+
+            return comentarios
+        else:
+            return None
 
 def get_information_elespectador(url:str, timeout=10):
     try:
@@ -298,29 +331,6 @@ def extract_article_number_elespectador(soup):
         return number
     else:
         print('no se encontró el número')
-        return None
-
-def extract_comments_elespectador(id_, timeout = 10):
-    if id_ is not None:
-        url = f'https://www.elespectador.com/pf/api/v3/content/fetch/comments?query=%7B"articleId"%3A"{id_}"%7D&d=937&_website=el-espectador'
-        
-        try:
-            response = requests.get(url, timeout=timeout)
-            response.raise_for_status()
-
-            data = response.json()
-            comentarios = [comment['content'] for comment in data.get('body', [])]
-
-        except requests.exceptions.RequestException as e:
-            print(f"Error en la solicitud: {e}")
-            comentarios = None
-
-        except ValueError as e:
-            print(f"Error al procesar la respuesta JSON: {e}")
-            comentarios = None
-
-        return comentarios
-    else:
         return None
 
 ###################### VANGUARDIA LIBERAL #####################################################

@@ -127,7 +127,7 @@ def create_comparison_tab():
 
 # Función para generar la nube de palabras
 def create_wordcloud():
-    # Cargar los datos de "mis datos.xlsx"
+    # Cargar los datos de "misdatos.xlsx"
     words_df = pd.read_excel('misdatos.xlsx')
     
     # Actualiza 'palabras' al nombre correcto de la columna en tu archivo
@@ -136,7 +136,7 @@ def create_wordcloud():
     text = ' '.join(words_df['token'])
     
     # Generar la nube de palabras
-    wordcloud = WordCloud(width=800, height=400, background_color='white').generate(text)
+    wordcloud = WordCloud(width=1200, height=1000, background_color='white').generate(text)
     
     # Mostrar la nube de palabras usando matplotlib
     plt.figure(figsize=(10, 5))
@@ -146,16 +146,84 @@ def create_wordcloud():
     # Convertir la figura de matplotlib en un objeto Panel
     return pn.pane.Matplotlib(plt.gcf(), width=800, height=400)
 
+# Función para crear la tabla interactiva de sentimientos con gráficos
+def create_sentiments_table():
+    # Cargar los datos de "misdatos1.xlsx"
+    sentiments_df = pd.read_excel('misdatos1.xlsx')
+    
+    # Crear una tabla interactiva con Tabulator
+    table = pn.widgets.Tabulator(
+        sentiments_df, 
+        pagination='local', 
+        page_size=20, 
+        sizing_mode='stretch_width'
+    )
+    
+    # Crear un gráfico de barras de la distribución de sentimientos
+    sentiment_counts = sentiments_df.groupby('sentiment')['count'].sum().reset_index()
+    bars = hv.Bars(sentiment_counts, kdims='sentiment', vdims='count').opts(
+        width=800, height=400, tools=[HoverTool(tooltips=[('Sentiment', '@sentiment'), ('Count', '@count')])],
+        xlabel='Sentiment', ylabel='Count', color='sentiment', show_legend=False, toolbar='above'
+    )
+    
+   # Crear un gráfico de barras de las palabras más frecuentes por sentimiento
+    words_by_sentiment = sentiments_df.groupby(['sentiment', 'lemma'])['count'].sum().reset_index()
+    words_by_sentiment = words_by_sentiment.sort_values(by='count', ascending=False).groupby('sentiment').head(10)
+    words_bars = hv.Bars(words_by_sentiment, kdims=['sentiment', 'lemma'], vdims='count').opts(
+        width=800, height=400, tools=[HoverTool(tooltips=[('Sentiment', '@sentiment'), ('Word', '@lemma'), ('Count', '@count')])],
+        xlabel='Sentiment', ylabel='Count', color='sentiment', show_legend=False, toolbar='above', xrotation=45
+    )
+    
+    # Crear un callback que actualiza los gráficos cuando la tabla se filtra
+    @pn.depends(table.param.value)
+    def update_visualizations(filtered_data):
+        if isinstance(filtered_data, dict):
+            filtered_df = pd.DataFrame(filtered_data)
+        else:
+            filtered_df = sentiments_df.copy()
+        
+        # Actualizar el gráfico de barras de la distribución de sentimientos
+        sentiment_counts = filtered_df.groupby('sentiment')['count'].sum().reset_index()
+        bars = hv.Bars(sentiment_counts, kdims='sentiment', vdims='count').opts(
+            width=800, height=400, tools=[HoverTool(tooltips=[('Sentiment', '@sentiment'), ('Count', '@count')])],
+            xlabel='Sentiment', ylabel='Count', color='sentiment', show_legend=False, toolbar='above'
+        )
+        
+        # Actualizar el gráfico de barras de las palabras más frecuentes por sentimiento
+        words_by_sentiment = filtered_df.groupby(['sentiment', 'lemma'])['count'].sum().reset_index()
+        words_by_sentiment = words_by_sentiment.sort_values(by='count', ascending=False).groupby('sentiment').head(10)
+        words_bars = hv.Bars(words_by_sentiment, kdims=['sentiment', 'lemma'], vdims='count').opts(
+            width=800, height=400, tools=[HoverTool(tooltips=[('Sentiment', '@sentiment'), ('Word', '@lemma'), ('Count', '@count')])],
+            xlabel='Sentiment', ylabel='Count', color='sentiment', show_legend=False, toolbar='above', xrotation=45
+        )
+        
+        return bars + words_bars
+    
+    # Combinar la tabla y los gráficos en un layout
+    layout = pn.Column(
+        "# Tabla de Sentimientos",
+        table,
+        "# Visualización de Sentimientos",
+        update_visualizations
+    )
+    
+    return layout
+
 # Crear el contenido principal
 dashboard_tab = create_dashboard_tab()
 metricas_1 = create_comparison_tab()
-metricas_2 = pn.Column("# Nube de Palabras", create_wordcloud())
+metricas_2 = pn.Column(
+    "# Nube de Palabras", 
+    create_wordcloud()
+)
+sentiments_tab = create_sentiments_table()
 
 # Crear las pestañas para métricas adicionales
 tabs = pn.Tabs(
     ("Dashboard", dashboard_tab),
     ("Comparación de Métricas", metricas_1),
-    ("Métricas 2", metricas_2),
+    ("Nube de Palabras", metricas_2),
+    ("Sentimientos", sentiments_tab),
     tabs_location='left',  # Mover las pestañas a la parte izquierda
     active=0  # Pestaña activa predeterminada
 )

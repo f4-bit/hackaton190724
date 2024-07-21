@@ -60,7 +60,7 @@ def filter_news(date_range_slider, keyword_input):
     def filter_func(date_range, keyword):
         filtered_df = df.copy()
         start_date, end_date = date_range
-        if start_date and end_date:
+        if (start_date and end_date) and not pd.isnull(start_date) and not pd.isnull(end_date):
             start_date = pd.to_datetime(start_date)
             end_date = pd.to_datetime(end_date)
             filtered_df = filtered_df[(filtered_df['date'] >= start_date) & (filtered_df['date'] <= end_date)]
@@ -126,17 +126,17 @@ def create_comparison_tab():
     )
 
 # Función para generar la nube de palabras
-def create_wordcloud():
-    # Cargar los datos de "misdatos.xlsx"
-    words_df = pd.read_excel('misdatos.xlsx')
+def create_wordcloud(file_path):
+    # Cargar los datos del archivo XLSX
+    words_df = pd.read_excel(file_path)
     
-    # Actualiza 'palabras' al nombre correcto de la columna en tu archivo
-    words_df['token'] = words_df['token'].astype(str)  # Convertir a cadenas
-    words_df = words_df.dropna(subset=['token'])  # Eliminar filas con NaN en 'token'
+    # Convertir a cadenas y eliminar filas con NaN en 'token'
+    words_df['token'] = words_df['token'].astype(str)
+    words_df = words_df.dropna(subset=['token'])
     text = ' '.join(words_df['token'])
     
     # Generar la nube de palabras
-    wordcloud = WordCloud(width=1200, height=1000, background_color='white').generate(text)
+    wordcloud = WordCloud(width=600, height=400, background_color='white').generate(text)
     
     # Mostrar la nube de palabras usando matplotlib
     plt.figure(figsize=(10, 5))
@@ -144,20 +144,12 @@ def create_wordcloud():
     plt.axis('off')
     
     # Convertir la figura de matplotlib en un objeto Panel
-    return pn.pane.Matplotlib(plt.gcf(), width=800, height=400)
+    return pn.pane.Matplotlib(plt.gcf(), width=600, height=400)
 
 # Función para crear la tabla interactiva de sentimientos con gráficos
 def create_sentiments_table():
-    # Cargar los datos de "misdatos1.xlsx"
-    sentiments_df = pd.read_excel('misdatos1.xlsx')
-    
-    # Crear una tabla interactiva con Tabulator
-    table = pn.widgets.Tabulator(
-        sentiments_df, 
-        pagination='local', 
-        page_size=20, 
-        sizing_mode='stretch_width'
-    )
+    # Cargar los datos de "sentiment_word_counts_text.xlsx"
+    sentiments_df = pd.read_excel('sentiment_word_counts_text.xlsx')
     
     # Crear un gráfico de barras de la distribución de sentimientos
     sentiment_counts = sentiments_df.groupby('sentiment')['count'].sum().reset_index()
@@ -166,45 +158,127 @@ def create_sentiments_table():
         xlabel='Sentiment', ylabel='Count', color='sentiment', show_legend=False, toolbar='above'
     )
     
-   # Crear un gráfico de barras de las palabras más frecuentes por sentimiento
-    words_by_sentiment = sentiments_df.groupby(['sentiment', 'lemma'])['count'].sum().reset_index()
-    words_by_sentiment = words_by_sentiment.sort_values(by='count', ascending=False).groupby('sentiment').head(10)
-    words_bars = hv.Bars(words_by_sentiment, kdims=['sentiment', 'lemma'], vdims='count').opts(
+    # Cargar los datos de "negative_words_text.xlsx"
+    negative_words_df = pd.read_excel('negative_words_text.xlsx')
+
+    # Crear un gráfico de barras para las palabras negativas más frecuentes
+    negative_words = negative_words_df.groupby(['sentiment', 'lemma'])['count'].sum().reset_index()
+    negative_words = negative_words[negative_words['count'] > 1]
+    negative_words = negative_words.sort_values(by='count', ascending=False).groupby('sentiment').head(10)
+    negative_words_bars = hv.Bars(negative_words, kdims=['sentiment', 'lemma'], vdims='count').opts(
         width=800, height=400, tools=[HoverTool(tooltips=[('Sentiment', '@sentiment'), ('Word', '@lemma'), ('Count', '@count')])],
         xlabel='Sentiment', ylabel='Count', color='sentiment', show_legend=False, toolbar='above', xrotation=45
     )
     
-    # Crear un callback que actualiza los gráficos cuando la tabla se filtra
-    @pn.depends(table.param.value)
-    def update_visualizations(filtered_data):
-        if isinstance(filtered_data, dict):
-            filtered_df = pd.DataFrame(filtered_data)
-        else:
-            filtered_df = sentiments_df.copy()
-        
-        # Actualizar el gráfico de barras de la distribución de sentimientos
-        sentiment_counts = filtered_df.groupby('sentiment')['count'].sum().reset_index()
-        bars = hv.Bars(sentiment_counts, kdims='sentiment', vdims='count').opts(
-            width=800, height=400, tools=[HoverTool(tooltips=[('Sentiment', '@sentiment'), ('Count', '@count')])],
-            xlabel='Sentiment', ylabel='Count', color='sentiment', show_legend=False, toolbar='above'
-        )
-        
-        # Actualizar el gráfico de barras de las palabras más frecuentes por sentimiento
-        words_by_sentiment = filtered_df.groupby(['sentiment', 'lemma'])['count'].sum().reset_index()
-        words_by_sentiment = words_by_sentiment.sort_values(by='count', ascending=False).groupby('sentiment').head(10)
-        words_bars = hv.Bars(words_by_sentiment, kdims=['sentiment', 'lemma'], vdims='count').opts(
-            width=800, height=400, tools=[HoverTool(tooltips=[('Sentiment', '@sentiment'), ('Word', '@lemma'), ('Count', '@count')])],
-            xlabel='Sentiment', ylabel='Count', color='sentiment', show_legend=False, toolbar='above', xrotation=45
-        )
-        
-        return bars + words_bars
+    # Cargar los datos de "negative_words_text_tiempo.xlsx"
+    negative_words_df_et = pd.read_excel('negative_words_text_tiempo.xlsx')
+
+    # Crear un gráfico de barras para las palabras negativas más frecuentes
+    negative_words_et = negative_words_df_et.groupby(['sentiment', 'lemma'])['count'].sum().reset_index()
+    negative_words_et = negative_words_et[negative_words_et['count'] > 1]
+    negative_words_et = negative_words_et.sort_values(by='count', ascending=False).groupby('sentiment').head(10)
+    negative_words_bars_et = hv.Bars(negative_words_et, kdims=['sentiment', 'lemma'], vdims='count').opts(
+        width=800, height=400, tools=[HoverTool(tooltips=[('Sentiment', '@sentiment'), ('Word', '@lemma'), ('Count', '@count')])],
+        xlabel='Sentiment', ylabel='Count', color='sentiment', show_legend=False, toolbar='above', xrotation=45
+    )
+
+    # Descripción del gráfico de palabras negativas
+    negative_words_description_1 = pn.pane.Markdown("""
+    ## Palabras Negativas Más Frecuentes
+    El gráfico a continuación muestra las palabras negativas más frecuentes encontradas en El Espectador.
+    """)
     
-    # Combinar la tabla y los gráficos en un layout
+    # Descripción del gráfico de palabras negativas
+    negative_words_description_2 = pn.pane.Markdown("""
+    ## Palabras Negativas Más Frecuentes
+    El gráfico a continuación muestra las palabras negativas más frecuentes encontradas en El Tiempo.
+    """)
+    
+    # Combinar los gráficos en un layout
     layout = pn.Column(
-        "# Tabla de Sentimientos",
-        table,
         "# Visualización de Sentimientos",
-        update_visualizations
+        bars,
+        negative_words_description_1,
+        negative_words_bars,
+        negative_words_description_2,
+        negative_words_bars_et
+    )
+    
+    return layout
+
+# Función para crear la pestaña de comentarios
+def create_comments_tab():
+    # Cargar los datos de los archivos XLSX
+    comments_df_tiempo = pd.read_excel('negative_words_comments_tiempo.xlsx')
+    comments_df = pd.read_excel('negative_words_comments.xlsx')
+    
+    # Crear un gráfico de barras de la distribución de comentarios negativos para El Tiempo
+    comments_counts_tiempo = comments_df_tiempo.groupby(['sentiment', 'lemma'])['count'].sum().reset_index()
+    comments_counts_tiempo = comments_counts_tiempo[comments_counts_tiempo['count'] > 1]
+    comments_counts_tiempo = comments_counts_tiempo.sort_values(by='count', ascending=False).groupby('sentiment').head(10)
+    comments_bars_tiempo = hv.Bars(comments_counts_tiempo, kdims=['sentiment', 'lemma'], vdims='count').opts(
+        width=800, height=400, tools=[HoverTool(tooltips=[('Sentiment', '@sentiment'), ('Word', '@lemma'), ('Count', '@count')])],
+        xlabel='Sentiment', ylabel='Count', color='sentiment', show_legend=False, toolbar='above', xrotation=45
+    )
+    
+    # Crear un gráfico de barras de la distribución de comentarios negativos para el otro periódico
+    comments_counts = comments_df.groupby(['sentiment', 'lemma'])['count'].sum().reset_index()
+    comments_counts = comments_counts[comments_counts['count'] > 1]
+    comments_counts = comments_counts.sort_values(by='count', ascending=False).groupby('sentiment').head(10)
+    comments_bars = hv.Bars(comments_counts, kdims=['sentiment', 'lemma'], vdims='count').opts(
+        width=800, height=400, tools=[HoverTool(tooltips=[('Sentiment', '@sentiment'), ('Word', '@lemma'), ('Count', '@count')])],
+        xlabel='Sentiment', ylabel='Count', color='sentiment', show_legend=False, toolbar='above', xrotation=45
+    )
+    
+    # Descripción del gráfico de comentarios negativos
+    comments_description_1 = pn.pane.Markdown("""
+    ## Comentarios Negativos Más Frecuentes - El Tiempo
+    El gráfico a continuación muestra las palabras negativas más frecuentes en los comentarios de El Tiempo.
+    """)
+    
+    # Descripción del gráfico de comentarios negativos
+    comments_description_2 = pn.pane.Markdown("""
+    ## Comentarios Negativos Más Frecuentes - Otro Periódico
+    El gráfico a continuación muestra las palabras negativas más frecuentes en los comentarios del otro periódico.
+    """)
+    
+    # Combinar los gráficos en un layout
+    layout = pn.Column(
+        "# Visualización de Comentarios Negativos",
+        comments_description_1,
+        comments_bars_tiempo,
+        comments_description_2,
+        comments_bars
+    )
+    
+    return layout
+
+# Función para crear la pestaña de nube de palabras
+def create_wordcloud_tab():
+    # Crear una nube de palabras para los comentarios
+    wordcloud_comments = create_wordcloud('comentarios.xlsx')
+    
+    # Crear una nube de palabras para el contenido
+    wordcloud_content = create_wordcloud('contenido.xlsx')
+    
+    # Descripciones para las nubes de palabras
+    wordcloud_description_1 = pn.pane.Markdown("""
+    ## Nube de Palabras - Comentarios
+    La siguiente nube de palabras muestra las palabras más frecuentes encontradas en los comentarios.
+    """)
+    
+    wordcloud_description_2 = pn.pane.Markdown("""
+    ## Nube de Palabras - Contenido
+    La siguiente nube de palabras muestra las palabras más frecuentes encontradas en el contenido.
+    """)
+    
+    # Combinar las nubes de palabras y descripciones en un layout
+    layout = pn.Column(
+        "# Nube de Palabras",
+        wordcloud_description_1,
+        wordcloud_comments,
+        wordcloud_description_2,
+        wordcloud_content
     )
     
     return layout
@@ -212,18 +286,17 @@ def create_sentiments_table():
 # Crear el contenido principal
 dashboard_tab = create_dashboard_tab()
 metricas_1 = create_comparison_tab()
-metricas_2 = pn.Column(
-    "# Nube de Palabras", 
-    create_wordcloud()
-)
+wordcloud_tab = create_wordcloud_tab()
 sentiments_tab = create_sentiments_table()
+comments_tab = create_comments_tab()
 
 # Crear las pestañas para métricas adicionales
 tabs = pn.Tabs(
     ("Dashboard", dashboard_tab),
     ("Comparación de Métricas", metricas_1),
-    ("Nube de Palabras", metricas_2),
+    ("Nube de Palabras", wordcloud_tab),
     ("Sentimientos", sentiments_tab),
+    ("Comentarios", comments_tab),
     tabs_location='left',  # Mover las pestañas a la parte izquierda
     active=0  # Pestaña activa predeterminada
 )
